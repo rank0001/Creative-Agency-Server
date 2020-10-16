@@ -34,6 +34,10 @@ client.connect((err) => {
 		.db(`${process.env.DB_NAME}`)
 		.collection("users");
 
+	const adminCollection = client
+		.db(`${process.env.DB_NAME}`)
+		.collection("admins");
+
 	console.log("database Connected successfully");
 
 	//getting all the services
@@ -52,11 +56,52 @@ client.connect((err) => {
 		});
 	});
 
-    //getting all the users
+	//getting all the users
 
 	app.get("/users", (req, res) => {
 		usersCollection.find({}).toArray((err, docs) => {
 			res.send(docs);
+		});
+	});
+
+	//update status
+
+	app.patch("/updateStatus/:id", (req, res) => {
+		usersCollection
+			.updateOne(
+				{ _id: ObjectId(req.params.id) },
+				{
+					$set: { status: req.body.status },
+				}
+			)
+			.then((resp) => {
+				res.send(resp);
+			});
+	});
+
+	//getting individual users
+
+	app.get("/user", (req, res) => {
+		const email = req.query.email;
+		usersCollection.find({ email }).toArray((err, docs) => {
+			res.send(docs);
+		});
+	});
+
+	//getting all the admins
+
+	app.get("/admin", (req, res) => {
+		adminCollection.find({}).toArray((err, docs) => {
+			res.send(docs);
+		});
+	});
+
+	//adding an admin
+
+	app.post("/addAdmin", (req, res) => {
+		const email = req.body;
+		adminCollection.insertOne(email).then((response) => {
+			res.send(response);
 		});
 	});
 
@@ -70,37 +115,45 @@ client.connect((err) => {
 		});
 	});
 
+	//adding a service
+
+	app.post("/addService", (req, res) => {
+		const file = req.files.file;
+		const title = req.body.title;
+		const description = req.body.description;
+		const filePath = `${__dirname}/services/${file.name}`;
+		file.mv(filePath, (err) => {
+			if (err) {
+				return res.status(500).send({ msg: "Failed To upload image" });
+			}
+
+			const newImage = fs.readFileSync(filePath);
+			const encImg = newImage.toString("base64");
+
+			let image = {
+				contentType: req.files.file.mimetype,
+				size: req.files.file.size,
+				img: Buffer.from(encImg, "base64"),
+			};
+
+			serviceCollection
+				.insertOne({ title, description, image })
+				.then((response) => {
+					fs.remove(filePath, (error) => {
+						if (error) console.log(error);
+						res.send(response.insertedCount > 0);
+					});
+				});
+		});
+	});
+
 	//adding user Info
 
 	app.post("/users", (req, res) => {
-		// const file = req.files.file;
-		// const name = req.body.name;
-		// const email = req.body.email;
-		// const service = req.body.service;
-		// const details = req.body.details;
-		// const price = req.body.price;
-        // const status = req.body.status;
-
-		// const filePath = `${__dirname}/services/${file.name}`;
-		// file.mv(filePath);
-		// console.log(filePath);
-
-		// const newImage = fs.readFileSync(filePath);
-		// const encImg = newImage.toString('base64');
-        // console.log(newImage,encImg);
-
-		// let image = {
-		// 	contentType: req.files.file.mimetype,
-		// 	size: req.files.file.size,
-		// 	img:  Buffer.from(encImg, 'base64'),
-		// };
-		// console.log(image, name, email, service, details, price);
-        const users = req.body
-		usersCollection
-			.insertOne(users )
-			.then((resp) => {
-				res.send(resp);
-			});
+		const users = req.body;
+		usersCollection.insertOne(users).then((resp) => {
+			res.send(resp);
+		});
 	});
 });
 
